@@ -1,4 +1,3 @@
-
 import { db } from "@/config/firebaseConfig";
 import LoaderPage from "@/Pages/LoaderPage";
 import { useAuth, useUser } from "@clerk/clerk-react";
@@ -20,10 +19,13 @@ const AuthHanlder = () => {
     const storeUserData = async () => {
       if (isSignedIn && user) {
         setLoading(true);
-         try {
-          const userSanp = await getDoc(doc(db, "users", user.id));
-          
-          if (!userSanp.exists()) {
+        try {
+          console.log("Attempting to access user document with ID:", user.id);
+          const userRef = doc(db, "users", user.id);
+          const userSnap = await getDoc(userRef);
+
+          if (!userSnap.exists()) {
+            console.log("User document doesn't exist, creating new one...");
             const userData = {
               id: user.id,
               phoneNo: user.primaryPhoneNumber?.phoneNumber || "N/A",
@@ -31,14 +33,27 @@ const AuthHanlder = () => {
               email: user.primaryEmailAddress?.emailAddress || "N/A",
               imageUrl: user.imageUrl,
               createdAt: serverTimestamp(),
-              updateAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
             };
 
-            await setDoc(doc(db, "users", user.id), userData);
-            
+            try {
+              await setDoc(userRef, userData);
+              console.log("Successfully created user document");
+            } catch (writeError) {
+              console.error("Error writing user document:", writeError);
+              throw writeError;
+            }
+          } else {
+            console.log("User document already exists");
           }
         } catch (error) {
-          console.log("Error on storing the user data : ", error);
+          console.error("Error on storing the user data:", error);
+          // Add more detailed error information
+          if (error.code === "permission-denied") {
+            console.error(
+              "Firebase permission denied. Please check security rules."
+            );
+          }
         } finally {
           setLoading(false);
         }
